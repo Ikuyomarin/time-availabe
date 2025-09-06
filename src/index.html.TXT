@@ -33,6 +33,7 @@
             return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ~ ${endHour.toString().padStart(2, '0')}:${actualEndMinute.toString().padStart(2, '0')}`;
         });
 
+        // 하드코딩된 예시 데이터
         const hardcodedReservations = [
             { program: "노래방A", effectiveTime: "09:00 ~ 10:00" },
             { program: "AR게임", effectiveTime: "10:00 ~ 10:30" },
@@ -57,15 +58,16 @@
             }
         };
 
-        const renderMain = () => {
-            const programsToDisplay = [
-                ...allPrograms.filter(p => !p.includes('노래방')),
-                '노래방'
-            ];
+        const renderMain = async () => {
             const mainContainer = document.createElement('div');
             mainContainer.id = 'main-container';
             mainContainer.innerHTML = `<h1>실시간 프로그램 현황</h1><div id="program-grid"></div>`;
             const programGrid = mainContainer.querySelector('#program-grid');
+
+            const programsToDisplay = [
+                ...allPrograms.filter(p => !p.includes('노래방')),
+                '노래방'
+            ];
 
             programsToDisplay.forEach(program => {
                 const button = document.createElement('button');
@@ -100,7 +102,7 @@
 
             programTimes.forEach(timeSlot => {
                 const timeSlotElement = document.createElement('div');
-                
+
                 const [start, end] = timeSlot.split('~').map(s => s.trim());
                 const [endHour, endMinute] = end.split(':').map(Number);
                 const slotEndMinutes = endHour * 60 + endMinute;
@@ -116,7 +118,7 @@
                 } else {
                     className = 'time-available';
                 }
-                
+
                 timeSlotElement.className = `time-slot ${className}`;
                 timeSlotElement.textContent = `${timeSlot} - ${className === 'time-available' ? '이용 가능' : className === 'time-unavailable' ? '예약 완료' : '지난 시간'}`;
                 timeSlotList.appendChild(timeSlotElement);
@@ -125,8 +127,9 @@
             app.innerHTML = '';
             app.appendChild(detailContainer);
         };
-        
+
         renderMain();
+        setInterval(renderMain, 5000);
     </script>
 </body>
 </html>
