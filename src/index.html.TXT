@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 프로그램 현황</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f0f2f5; }
+        h1 { color: #333; }
+        #main-container, #detail-container { max-width: 800px; margin: 0 auto; padding-top: 20px; }
+        #program-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 40px; }
+        .program-button { width: 100%; padding: 30px 20px; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; font-size: 1.5rem; color: white; background-color: #007bff; border: none; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-decoration: none; }
+        .time-slot { padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 1.2rem; font-weight: bold; color: white; }
+        .time-available { background-color: #28a745; }
+        .time-unavailable { background-color: #dc3545; }
+        .time-passed { background-color: #333; }
+        .back-button { display: block; width: 100%; padding: 15px; margin-top: 20px; background-color: #007bff; color: white; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script>
+        const app = document.getElementById('app');
+
+        const allPrograms = ["AR게임", "XR게임", "오락게임A", "오락게임B", "오락게임C", "레이싱게임A", "레이싱게임B", "농구게임", "노래방A", "노래방B", "포켓볼"];
+        const hourlyPrograms = new Set(["노래방A", "노래방B", "포켓볼"]);
+        const times = Array.from({ length: 22 }, (_, i) => {
+            const hour = Math.floor(i / 2) + 9;
+            const minute = i % 2 === 0 ? 0 : 30;
+            const endMinute = minute + 25;
+            const endHour = Math.floor((hour * 60 + endMinute) / 60);
+            const actualEndMinute = (hour * 60 + endMinute) % 60;
+            return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ~ ${endHour.toString().padStart(2, '0')}:${actualEndMinute.toString().padStart(2, '0')}`;
+        });
+
+        const fetchStatus = async () => {
+            const [reservations, disabled] = await Promise.all([
+                fetch('/api/reservations').then(res => res.json()),
+                fetch('/api/programs/disabled').then(res => res.json()),
+            ]);
+            return { reservations, disabled };
+        };
+
+        const renderMain = async () => {
+            const { reservations, disabled } = await fetchStatus();
+
+            const programsToDisplay = [
+                ...allPrograms.filter(p => !p.includes('노래방')),
+                '노래방'
+            ];
+
+            const mainContainer = document.createElement('div');
+            mainContainer.id = 'main-container';
+            mainContainer.innerHTML = `<h1>실시간 프로그램 현황</h1><div id="program-grid"></div>`;
+            const programGrid = mainContainer.querySelector('#program-grid');
+
+            programsToDisplay.forEach(program => {
+                const button = document.createElement('button');
+                button.className = 'program-button';
+                button.textContent = program;
+                button.onclick = () => renderDetail(program, reservations, disabled);
+                programGrid.appendChild(button);
+            });
+
+            app.innerHTML = '';
+            app.appendChild(mainContainer);
+        };
+
+        const renderDetail = async (program, reservations, disabled) => {
+            const now = new Date();
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+            const isProgramHourly = hourlyPrograms.has(program);
+            const programTimes = isProgramHourly ? times.filter((_, i) => i % 2 === 0).map((t, i) => {
+                const nextTime = times[i * 2 + 1];
+                const [start, _] = t.split('~');
+                const [__, end] = nextTime.split('~');
+                return `${start.trim()} ~ ${end.trim()}`;
+            }) : times;
+
+            const detailContainer = document.createElement('div');
+            detailContainer.id = 'detail-container';
+            detailContainer.innerHTML = `<h1>${program} 시간표</h1><div id="time-slot-list"></div><a href="#" class="back-button">홈으로 돌아가기</a>`;
+            const timeSlotList = detailContainer.querySelector('#time-slot-list');
+            const backButton = detailContainer.querySelector('.back-button');
+            backButton.onclick = renderMain;
+
+            programTimes.forEach(timeSlot => {
+                const timeSlotElement = document.createElement('div');
+                timeSlotElement.textContent = timeSlot;
+
+                const [start, end] = timeSlot.split('~').map(s => s.trim());
+                const [startHour, startMinute] = start.split(':').map(Number);
+                const [endHour, endMinute] = end.split(':').map(Number);
+                const slotStartMinutes = startHour * 60 + startMinute;
+                const slotEndMinutes = endHour * 60 + endMinute;
+
+                let className = '';
+
+                if (nowMinutes > slotEndMinutes) {
+                    className = 'time-passed';
+                } else {
+                    const isReserved = reservations.some(r => r.program === program && r.effectiveTime === timeSlot);
+                    const isDisabled = disabled.includes(program);
+                    if (isReserved || isDisabled) {
+                        className = 'time-unavailable';
+                    } else {
+                        className = 'time-available';
+                    }
+                }
+
+                timeSlotElement.className = `time-slot ${className}`;
+                timeSlotList.appendChild(timeSlotElement);
+            });
+
+            app.innerHTML = '';
+            app.appendChild(detailContainer);
+        };
+
+        renderMain();
+        setInterval(renderMain, 5000);
+    </script>
+</body>
+</html>

@@ -1,17 +1,20 @@
-const API_BASE_URL = "http://localhost:3000";
+import { VercelRequest, VercelResponse } from '@vercel/node';
 
-export async function fetchReservations() {
-  const response = await fetch(`${API_BASE_URL}/api/reservations`);
-  if (!response.ok) {
-    throw new Error('예약 정보를 불러오는 데 실패했습니다.');
-  }
-  return response.json();
-}
+const hardcodedReservations = [
+  { program: "노래방A", effectiveTime: "09:00 ~ 10:00" },
+  { program: "AR게임", effectiveTime: "10:00 ~ 10:30" },
+];
 
-export async function fetchDisabledPrograms() {
-  const response = await fetch(`${API_BASE_URL}/api/programs/disabled`);
-  if (!response.ok) {
-    throw new Error('비활성화 프로그램 정보를 불러오는 데 실패했습니다.');
+const hardcodedDisabled = ["오락게임C"];
+
+export default function (request: VercelRequest, response: VercelResponse) {
+  const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
+
+  if (pathname === '/api/reservations') {
+    response.status(200).json(hardcodedReservations);
+  } else if (pathname === '/api/programs/disabled') {
+    response.status(200).json(hardcodedDisabled);
+  } else {
+    response.status(404).json({ error: 'Not Found' });
   }
-  return response.json();
 }

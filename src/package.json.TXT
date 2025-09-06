@@ -1,0 +1,10 @@
+{
+  "name": "kiosk-available-time",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}
