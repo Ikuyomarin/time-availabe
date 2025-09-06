@@ -33,22 +33,35 @@
             return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ~ ${endHour.toString().padStart(2, '0')}:${actualEndMinute.toString().padStart(2, '0')}`;
         });
 
-        const fetchStatus = async () => {
-            const [reservations, disabled] = await Promise.all([
-                fetch('/api/reservations').then(res => res.json()),
-                fetch('/api/programs/disabled').then(res => res.json()),
-            ]);
-            return { reservations, disabled };
+        const hardcodedReservations = [
+            { program: "노래방A", effectiveTime: "09:00 ~ 10:00" },
+            { program: "AR게임", effectiveTime: "10:00 ~ 10:30" },
+        ];
+        const hardcodedDisabled = ["오락게임C"];
+
+        const getStatusForTime = (program, timeSlot) => {
+            const now = new Date();
+            const [start, end] = timeSlot.split('~').map(s => s.trim());
+            const [endHour, endMinute] = end.split(':').map(Number);
+            const slotEndMinutes = endHour * 60 + endMinute;
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+            if (nowMinutes > slotEndMinutes) {
+                return 'passed';
+            } else if (hardcodedDisabled.includes(program)) {
+                return 'disabled';
+            } else {
+                const targetPrograms = program === '노래방' ? ["노래방A", "노래방B"] : [program];
+                const isReserved = hardcodedReservations.some(r => targetPrograms.includes(r.program) && r.effectiveTime === timeSlot);
+                return isReserved ? 'unavailable' : 'available';
+            }
         };
 
-        const renderMain = async () => {
-            const { reservations, disabled } = await fetchStatus();
-
+        const renderMain = () => {
             const programsToDisplay = [
                 ...allPrograms.filter(p => !p.includes('노래방')),
                 '노래방'
             ];
-
             const mainContainer = document.createElement('div');
             mainContainer.id = 'main-container';
             mainContainer.innerHTML = `<h1>실시간 프로그램 현황</h1><div id="program-grid"></div>`;
@@ -58,7 +71,7 @@
                 const button = document.createElement('button');
                 button.className = 'program-button';
                 button.textContent = program;
-                button.onclick = () => renderDetail(program, reservations, disabled);
+                button.onclick = () => renderDetail(program);
                 programGrid.appendChild(button);
             });
 
@@ -66,7 +79,7 @@
             app.appendChild(mainContainer);
         };
 
-        const renderDetail = async (program, reservations, disabled) => {
+        const renderDetail = (program) => {
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -87,38 +100,33 @@
 
             programTimes.forEach(timeSlot => {
                 const timeSlotElement = document.createElement('div');
-                timeSlotElement.textContent = timeSlot;
-
+                
                 const [start, end] = timeSlot.split('~').map(s => s.trim());
-                const [startHour, startMinute] = start.split(':').map(Number);
                 const [endHour, endMinute] = end.split(':').map(Number);
-                const slotStartMinutes = startHour * 60 + startMinute;
                 const slotEndMinutes = endHour * 60 + endMinute;
 
                 let className = '';
+                const isReserved = hardcodedReservations.some(r => r.program === program && r.effectiveTime === timeSlot);
+                const isDisabled = hardcodedDisabled.includes(program);
 
                 if (nowMinutes > slotEndMinutes) {
                     className = 'time-passed';
+                } else if (isReserved || isDisabled) {
+                    className = 'time-unavailable';
                 } else {
-                    const isReserved = reservations.some(r => r.program === program && r.effectiveTime === timeSlot);
-                    const isDisabled = disabled.includes(program);
-                    if (isReserved || isDisabled) {
-                        className = 'time-unavailable';
-                    } else {
-                        className = 'time-available';
-                    }
+                    className = 'time-available';
                 }
-
+                
                 timeSlotElement.className = `time-slot ${className}`;
+                timeSlotElement.textContent = `${timeSlot} - ${className === 'time-available' ? '이용 가능' : className === 'time-unavailable' ? '예약 완료' : '지난 시간'}`;
                 timeSlotList.appendChild(timeSlotElement);
             });
 
             app.innerHTML = '';
             app.appendChild(detailContainer);
         };
-
+        
         renderMain();
-        setInterval(renderMain, 5000);
     </script>
 </body>
 </html>
